@@ -5,7 +5,11 @@ class SeedDump
         # If the records don't already have an order,
         # order them by primary key ascending.
         if !records.respond_to?(:arel) || records.arel.orders.blank?
-          records.order("#{records.quoted_table_name}.#{records.quoted_primary_key} ASC")
+          if options[:mongo].present?
+            records.order("#{records}.#{records.__id__} ASC")
+          else
+            records.order("#{records.quoted_table_name}.#{records.quoted_primary_key} ASC")
+          end
         end
 
         num_of_batches, batch_size, last_batch_size = batch_params_from(records, options)
@@ -25,7 +29,7 @@ class SeedDump
 
           # Loop through the records of the current batch
           records.offset((batch_number - 1) * batch_size).limit(cur_batch_size).each do |record|
-            record_strings << dump_record(record, options)
+            record_strings << dump_record(record, io, options)
           end
 
           yield record_strings, last_batch
@@ -40,7 +44,7 @@ class SeedDump
         batch_number = 1
 
         records.each_with_index do |record, i|
-          record_strings << dump_record(record, options)
+          record_strings << dump_record(record, io, options)
 
           last_batch = (i == records.length - 1)
 

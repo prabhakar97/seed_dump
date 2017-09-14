@@ -7,7 +7,7 @@ class SeedDump
 
       io = open_io(options)
 
-      write_records_to_io(records, io, options)
+      write_records_to_io(records, io, options, true)
 
       ensure
         io.close if io.present?
@@ -15,14 +15,26 @@ class SeedDump
 
     private
 
-    def dump_record(record, options)
+    def dump_record(record, io, options)
       attribute_strings = []
 
-      # We select only string attribute names to avoid conflict
-      # with the composite_primary_keys gem (it returns composite
-      # primary key attribute names as hashes).
-      record.attributes.select {|key| key.is_a?(String) }.each do |attribute, value|
-        attribute_strings << dump_attribute_new(attribute, value, options) unless options[:exclude].include?(attribute.to_sym)
+      if record.respond_to? :attributes
+        # We select only string attribute names to avoid conflict
+        # with the composite_primary_keys gem (it returns composite
+        # primary key attribute names as hashes).
+        record.attributes.select {|key| key.is_a?(String) }.each do |attribute, value|
+          attribute_strings << dump_attribute_new(attribute, value, io, options) unless options[:exclude].include?(attribute.to_sym)
+        end
+      elsif record.class == BSON::ObjectId || record.class == Fixnum || record.class == String
+        # Received an id element of a whole array of single record ids
+        attribute = "_id"
+        value = record
+        attribute_strings << dump_attribute_new(attribute, value, io, options)
+      else
+        # use record.each directly for mongo internal documents
+        record.each do |attribute, value|
+          attribute_strings << dump_attribute_new(attribute, value, io, options) unless options[:exclude].include?(attribute.to_sym)
+        end
       end
 
       open_character, close_character = options[:import] ? ['[', ']'] : ['{', '}']
@@ -30,12 +42,18 @@ class SeedDump
       "#{open_character}#{attribute_strings.join(", ")}#{close_character}"
     end
 
-    def dump_attribute_new(attribute, value, options)
-      options[:import] ? value_to_s(value) : "#{attribute}: #{value_to_s(value)}"
+    def dump_attribute_new(attribute, value, io, options)
+      options[:import] ? value_to_s(value, io, options) : "#{attribute}: #{value_to_s(value, io, options)}"
     end
 
-    def value_to_s(value)
+    def value_to_s(value, io, options)
       value = case value
+              when Array
+                buffer = open_io(file: false)
+                write_records_to_io(value, buffer, options, false)
+                buffer.string
+              when BSON::ObjectId
+                value.inspect
               when BigDecimal, IPAddr
                 value.to_s
               when Date, Time, DateTime
@@ -67,15 +85,20 @@ class SeedDump
       end
     end
 
-    def write_records_to_io(records, io, options)
+    def write_records_to_io(records, io, options, main)
       options[:exclude] ||= [:id, :created_at, :updated_at]
 
-      method = options[:import] ? 'import' : 'create!'
-      io.write("#{model_for(records)}.#{method}(")
+      if main
+        method = options[:import] ? 'import' : 'create!'
+        io.write("#{model_for(records)}.#{method}(")
+        io.write("[\n ")
+      else
+        io.write("[")
+      end
       if options[:import]
         io.write("[#{attribute_names(records, options).map {|name| name.to_sym.inspect}.join(', ')}], ")
+        io.write("[\n  ")
       end
-      io.write("[\n  ")
 
       enumeration_method = if records.is_a?(ActiveRecord::Relation) || records.is_a?(Class)
                              :active_record_enumeration
@@ -84,12 +107,20 @@ class SeedDump
                            end
 
       send(enumeration_method, records, io, options) do |record_strings, last_batch|
-        io.write(record_strings.join(",\n  "))
-
+        if main
+          io.write(record_strings.join(",\n  "))
+        else
+          io.write(record_strings.join(", "))
+        end
         io.write(",\n  ") unless last_batch
       end
 
       io.write("\n])\n")
+      if main
+        io.write("\n])\n")
+      else
+        io.write("]")
+      end
 
       if options[:file].present?
         nil
