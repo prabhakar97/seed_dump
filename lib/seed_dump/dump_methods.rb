@@ -115,7 +115,6 @@ class SeedDump
         io.write(",\n  ") unless last_batch
       end
 
-      io.write("\n])\n")
       if main
         io.write("\n])\n")
       else
