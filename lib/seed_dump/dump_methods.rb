@@ -100,7 +100,7 @@ class SeedDump
         io.write("[\n  ")
       end
 
-      enumeration_method = if records.is_a?(::ActiveRecord::Relation) || records.is_a?(Class)
+      enumeration_method = if records.is_a?(Class)
                              :active_record_enumeration
                            else
                              :enumerable_enumeration
@@ -131,7 +131,7 @@ class SeedDump
     end
 
     def attribute_names(records, options)
-      attribute_names = if records.is_a?(::ActiveRecord::Relation) || records.is_a?(Class)
+      attribute_names = if records.is_a?(Class)
                           records.attribute_names
                         else
                           records[0].attribute_names
