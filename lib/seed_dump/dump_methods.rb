@@ -22,10 +22,10 @@ class SeedDump
         # We select only string attribute names to avoid conflict
         # with the composite_primary_keys gem (it returns composite
         # primary key attribute names as hashes).
-        record.attributes.select {|key| key.is_a?(String) }.each do |attribute, value|
+        record.attributes.select { |key| key.is_a?(String) }.each do |attribute, value|
           attribute_strings << dump_attribute_new(attribute, value, io, options) unless options[:exclude].include?(attribute.to_sym)
         end
-      elsif record.class == BSON::ObjectId || record.class == Fixnum || record.class == String
+      elsif [BSON::ObjectId, Fixnum, String].include?(record.class)
         # Received an id element of a whole array of single record ids
         attribute = "_id"
         value = record

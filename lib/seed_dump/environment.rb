@@ -9,7 +9,7 @@ class SeedDump
       # Handle mongoid
       mongo = env['MONGO'] == 'true'
       if mongo
-        mongo_tables = Mongoid.default_session.collections.map(&:name).join(",")
+        mongo_tables = Mongoid.default_client.collections.map(&:name).join(",")
         models_env = env['MODEL'] || env['MODELS'] || mongo_tables
       else
         models_env = env['MODEL'] || env['MODELS']
