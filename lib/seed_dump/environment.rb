@@ -15,14 +15,7 @@ class SeedDump
         models_env = env['MODEL'] || env['MODELS']
       end
       models_with_empties = if models_env
-                 models_env.split(',')
-                   .collect do |x|
-                    y = x.strip.underscore.singularize.camelize
-                    begin
-                      y.constantize
-                    rescue NameError => err
-                    end
-                 end
+                              models_env.split(',').map { |x| x.strip.underscore.singularize.camelize.constantize }
                else
                  ActiveRecord::Base.descendants
                end
@@ -38,16 +31,7 @@ class SeedDump
 
       models_exclude_env = env['MODELS_EXCLUDE']
       if models_exclude_env
-        models_exclude_env.split(',')
-                          .collect do |x|
-                            y = x.strip.underscore.singularize.camelize
-                            begin
-                              y.constantize
-                            rescue NameError => err
-
-                            end
-                          end
-                          .each { |exclude| models.delete(exclude) }
+        models_env.split(',').map { |x| x.strip.underscore.singularize.camelize.constantize }.each { |exclude| models.delete(exclude) }
       end
 
       models.each do |model|
